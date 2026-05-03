@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Location Tracking</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      :root {
+        color-scheme: light;
+        --bg: #f7f7f2;
+        --panel: #ffffff;
+        --text: #172018;
+        --muted: #657064;
+        --border: #d8ddd2;
+        --accent: #0f766e;
+        --accent-dark: #0b5f59;
+        --danger: #b42318;
+        --shadow: 0 16px 45px rgb(23 32 24 / 0.14);
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 100%;
+      }
+
+      .topbar {
+        z-index: 500;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.85rem 1rem;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 1px 0 rgb(23 32 24 / 0.04);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+      }
+
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 2.3rem;
+        height: 2.3rem;
+        color: #ffffff;
+        background: var(--accent);
+        border-radius: 8px;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.2;
+      }
+
+      .status {
+        margin: 0.2rem 0 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .user {
+        color: var(--muted);
+        font-size: 0.85rem;
+        max-width: 28ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      button {
+        height: 2.25rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0 0.8rem;
+        color: var(--text);
+        background: #ffffff;
+        font: inherit;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+
+      button.primary {
+        color: #ffffff;
+        border-color: var(--accent);
+        background: var(--accent);
+      }
+
+      button:hover {
+        border-color: var(--accent);
+      }
+
+      button.primary:hover {
+        background: var(--accent-dark);
+      }
+
+      .map-wrap {
+        position: relative;
+        min-height: 0;
+      }
+
+      #map {
+        height: 100%;
+        min-height: 22rem;
+      }
+
+      .panel {
+        position: absolute;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 450;
+        width: min(22rem, calc(100% - 2rem));
+        padding: 0.9rem;
+        background: rgb(255 255 255 / 0.94);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.7rem;
+        font-weight: 700;
+      }
+
+      .count {
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+
+      .feed {
+        display: grid;
+        gap: 0.55rem;
+        max-height: 13rem;
+        overflow: auto;
+      }
+
+      .empty,
+      .feed-item {
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.4;
+      }
+
+      .feed-item {
+        display: grid;
+        gap: 0.15rem;
+        padding-top: 0.55rem;
+        border-top: 1px solid var(--border);
+      }
+
+      .feed-item strong {
+        color: var(--text);
+      }
+
+      .error {
+        color: var(--danger);
+      }
+
+      @media (max-width: 680px) {
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .user {
+          max-width: 18ch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">LT</div>
+          <div>
+            <h1>Location Tracking</h1>
+            <p class="status" id="status">Preparing secure session...</p>
+          </div>
+        </div>
+        <div class="actions">
+          <span class="user" id="userLabel"></span>
+          <button id="shareBtn" class="primary" type="button">Share now</button>
+          <button id="logoutBtn" type="button">Sign out</button>
+        </div>
+      </header>
+
+      <section class="map-wrap" aria-label="Live location map">
+        <div id="map"></div>
+        <aside class="panel">
+          <div class="panel-title">
+            <span>Live people</span>
+            <span class="count" id="count">0 active</span>
+          </div>
+          <div class="feed" id="feed">
+            <p class="empty">Waiting for authenticated location updates.</p>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+      const tokenKey = 'location-tracking:oidc-token';
+      const statusEl = document.getElementById('status');
+      const userLabel = document.getElementById('userLabel');
+      const shareBtn = document.getElementById('shareBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const feed = document.getElementById('feed');
+      const count = document.getElementById('count');
+      const remoteMarkers = new Map();
+      const latestLocations = new Map();
+      let myCurrentLocationMarker = null;
+      let socket = null;
+
+      const map = L.map('map').setView([20.5937, 78.9629], 5);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.classList.toggle('error', isError);
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => {
+          const entities = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+          };
+          return entities[char];
+        });
+      }
+
+      function createState() {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function captureReturnedToken() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (!token) return localStorage.getItem(tokenKey);
+
+        localStorage.setItem(tokenKey, token);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return token;
+      }
+
+      async function redirectToLogin() {
+        const res = await fetch('/auth/config');
+        const config = await res.json();
+        const loginUrl = new URL(config.loginUrl);
+        loginUrl.searchParams.set('state', createState());
+        window.location.href = loginUrl.toString();
+      }
+
+      async function getCurrentUser(token) {
+        const res = await fetch('/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return null;
+        return res.json();
+      }
+
+      function getUsersCurrentLocation() {
+        return new Promise((resolve, reject) => {
+          if (!('geolocation' in navigator)) {
+            reject(new Error('Geolocation is not available in this browser.'));
+            return;
+          }
+
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              resolve({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              });
+            },
+            reject,
+            { enableHighAccuracy: true, maximumAge: 5000 },
+          );
+        });
+      }
+
+      function updateFeed() {
+        const locations = Array.from(latestLocations.values()).sort((a, b) =>
+          (b.updatedAt || '').localeCompare(a.updatedAt || ''),
+        );
+
+        count.textContent = `${locations.length} active`;
+
+        if (!locations.length) {
+          feed.innerHTML =
+            '<p class="empty">Waiting for authenticated location updates.</p>';
+          return;
+        }
+
+        feed.innerHTML = locations
+          .map((item) => {
+            const label = item.name || item.email || item.id;
+            const time = item.updatedAt
+              ? new Date(item.updatedAt).toLocaleTimeString()
+              : 'just now';
+            return `<div class="feed-item"><strong>${escapeHtml(label)}</strong><span>${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)} · ${escapeHtml(time)}</span></div>`;
+          })
+          .join('');
+      }
+
+      function renderLocation(data) {
+        const { id, name, email, latitude, longitude } = data;
+        const label = name || email || id;
+
+        latestLocations.set(id, data);
+        updateFeed();
+
+        if (!remoteMarkers.has(id)) {
+          const marker = L.marker([latitude, longitude])
+            .addTo(map)
+            .bindPopup(label);
+          remoteMarkers.set(id, marker);
+          return;
+        }
+
+        remoteMarkers.get(id).setLatLng([latitude, longitude]).setPopupContent(label);
+      }
+
+      async function shareLocation() {
+        try {
+          setStatus('Reading your location...');
+          const { latitude, longitude } = await getUsersCurrentLocation();
+          socket.emit('client:location:update', { latitude, longitude });
+
+          if (!myCurrentLocationMarker) {
+            myCurrentLocationMarker = L.marker([latitude, longitude])
+              .addTo(map)
+              .bindPopup('You are here');
+            map.setView([latitude, longitude], 15);
+          } else {
+            myCurrentLocationMarker.setLatLng([latitude, longitude]);
+          }
+
+          setStatus('Location shared. Updates continue every 10 seconds.');
+        } catch (error) {
+          setStatus(error.message || 'Could not read your location.', true);
+        }
+      }
+
+      async function main() {
+        const token = captureReturnedToken();
+        if (!token) {
+          await redirectToLogin();
+          return;
+        }
+
+        const user = await getCurrentUser(token);
+        if (!user) {
+          localStorage.removeItem(tokenKey);
+          await redirectToLogin();
+          return;
+        }
+
+        userLabel.textContent = user.name || user.email;
+        setStatus('Connecting to Kafka-backed live map...');
+
+        socket = io({ auth: { token } });
+        socket.on('connect', () => {
+          setStatus('Connected. Share your location when ready.');
+        });
+        socket.on('connect_error', async () => {
+          localStorage.removeItem(tokenKey);
+          await redirectToLogin();
+        });
+        socket.on('server:error', (data) => setStatus(data.message, true));
+        socket.on('server:location:update', renderLocation);
+
+        shareBtn.addEventListener('click', shareLocation);
+        logoutBtn.addEventListener('click', () => {
+          localStorage.removeItem(tokenKey);
+          window.location.reload();
+        });
+
+        await shareLocation();
+        setInterval(shareLocation, 10 * 1000);
+      }
+
+      window.addEventListener('load', main);
+    </script>
+  </body>
+</html>
